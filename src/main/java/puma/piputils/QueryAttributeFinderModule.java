@@ -21,11 +21,14 @@ package puma.piputils;
 
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Set;
 import java.util.logging.Logger;
 
@@ -38,6 +41,7 @@ import com.sun.xacml.attr.AttributeValue;
 import com.sun.xacml.attr.BagAttribute;
 import com.sun.xacml.attr.BooleanAttribute;
 import com.sun.xacml.attr.DateTimeAttribute;
+import com.sun.xacml.attr.IntegerAttribute;
 import com.sun.xacml.attr.StringAttribute;
 import com.sun.xacml.cond.EvaluationResult;
 import com.sun.xacml.ctx.Status;
@@ -167,7 +171,7 @@ public class QueryAttributeFinderModule extends AttributeFinderModule {
 		// BagAttribute.createEmptyBag(attributeType));
 		// }
 		// DEBUG
-		logger.info("fetching attribute " + attributeId.toASCIIString() + " ("
+		logger.info("Fetching attribute " + attributeId.toASCIIString() + " ("
 				+ designatorType + ")");
 		// / DEBUG
 		// We're OK to go, so start with fetching the
@@ -280,13 +284,13 @@ public class QueryAttributeFinderModule extends AttributeFinderModule {
 		// FIXME if the attribute ids are not unique over the different tenants,
 		// we need
 		// to provide the entityId as well to first provide the organization
-		// owning the attribute family
-		DataType dt = this.edb.getDataType(attributeId);
-		
+		// owning the attribute family --> EXTRA JOIN
+		Tuple<Set<String>, DataType> queryResult = this.edb.getAttribute(entityId, attributeId);
+				
 		List<AttributeValue> result = new ArrayList<AttributeValue>();
-		if (dt == DataType.String) {
-			Collection<String> values = edb.getStringAttribute(entityId,
-					attributeId);
+		
+		if (queryResult.getType().equals(DataType.String)) {
+			Collection<String> values = queryResult.getData();
 			if (values.isEmpty()) {
 				logger.warning("No values found for attribute (attribute id: "
 						+ attributeId + ", entity id: " + entityId + ")");
@@ -295,9 +299,10 @@ public class QueryAttributeFinderModule extends AttributeFinderModule {
 					result.add(new StringAttribute(s));
 				}
 			}
-		} else if (dt == DataType.Boolean) {
-			Collection<Boolean> values = edb.getBooleanAttribute(entityId,
-					attributeId);
+		} else if (queryResult.getType().equals(DataType.Boolean)) {
+			Collection<Boolean> values = new HashSet<Boolean>();
+			for (String next: queryResult.getData())
+				values.add(Boolean.parseBoolean(next));
 			if (values.isEmpty()) {
 				logger.warning("No values found for attribute (attribute id: "
 						+ attributeId + ", entity id: " + entityId + ")");
@@ -306,9 +311,14 @@ public class QueryAttributeFinderModule extends AttributeFinderModule {
 					result.add(BooleanAttribute.getInstance(b));
 				}
 			}
-		} else if (dt == DataType.DateTime) {
-			Collection<Date> values = edb.getDateAttribute(entityId,
-					attributeId);
+		} else if (queryResult.getType().equals(DataType.DateTime)) {
+			Collection<Date> values = new HashSet<Date>();
+			for (String next: queryResult.getData())
+				try {
+					values.add(new SimpleDateFormat("MMMM d, yyyy", Locale.ENGLISH).parse(next)); // DEBUG LATER this may not be the format in which the date is stored in the db
+				} catch (ParseException e) {
+					logger.warning("Could not parse date from internal format. Returning empty result...");
+				}	
 			if (values.isEmpty()) {
 				logger.warning("No values found for attribute (attribute id: "
 						+ attributeId + ", entity id: " + entityId + ")");
@@ -317,7 +327,16 @@ public class QueryAttributeFinderModule extends AttributeFinderModule {
 					result.add(new DateTimeAttribute(d));
 				}
 			}
-		} // TODO add datetime
+		} else if (queryResult.getType().equals(DataType.Integer)) {
+			if (queryResult.getData().isEmpty()) {
+				logger.warning("No values found for attribute (attribute id: "
+						+ attributeId + ", entity id: " + entityId + ")");
+			} else {
+				for (String next: queryResult.getData()) {
+					result.add(IntegerAttribute.getInstance(next));
+				}
+			}
+		}
 		return result;
 	}
 }

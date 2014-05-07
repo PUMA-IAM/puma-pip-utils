@@ -7,10 +7,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.ParseException;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -66,8 +64,6 @@ public class EntityDatabase {
 	private Connection conn = null;
 
 	private PreparedStatement getStringAttributeStmt = null;
-	private PreparedStatement getDataTypeStmt = null;
-	private PreparedStatement getFamilyIdStmt = null;
 	private PreparedStatement getSupportedXACMLAttributeIdsStmt = null;
 
 	/**
@@ -88,9 +84,7 @@ public class EntityDatabase {
 			conn.setReadOnly(readOnly);
 			conn.setAutoCommit(false);
 			conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
-			getStringAttributeStmt = this.conn.prepareStatement("SELECT SP_ATTR.value FROM SP_ATTRTYPE USE INDEX (familyById) INNER JOIN SP_ATTR ON SP_ATTR.family_id=SP_ATTRTYPE.id AND SP_ATTRTYPE.xacmlIdentifier=? and SP_ATTR.user_id=?");
-			getDataTypeStmt = this.conn.prepareStatement("SELECT dataType FROM SP_ATTRTYPE USE INDEX (familyById) WHERE xacmlIdentifier=?");			
-			getFamilyIdStmt = this.conn.prepareStatement("SELECT id FROM SP_ATTRTYPE USE INDEX (familyById) WHERE xacmlIdentifier=?");
+			getStringAttributeStmt = this.conn.prepareStatement("SELECT SP_ATTR.value, SP_ATTRTYPE.dataType FROM SP_ATTRTYPE USE INDEX (familyById) INNER JOIN SP_ATTR ON SP_ATTR.family_id=SP_ATTRTYPE.id AND SP_ATTRTYPE.xacmlIdentifier=? and SP_ATTR.user_id=?");
 			getSupportedXACMLAttributeIdsStmt = this.conn.prepareStatement("SELECT xacmlIdentifier FROM SP_ATTRTYPE");
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE, "Cannot open connection.", e);
@@ -115,12 +109,6 @@ public class EntityDatabase {
 		try {
 			if (getStringAttributeStmt != null) {
 				getStringAttributeStmt.close();
-			}
-			if (getDataTypeStmt != null) {
-				getDataTypeStmt.close();
-			}
-			if (getFamilyIdStmt != null) {
-				getFamilyIdStmt.close();
 			}
 			if (getSupportedXACMLAttributeIdsStmt != null) {
 				getSupportedXACMLAttributeIdsStmt.close();
@@ -158,39 +146,36 @@ public class EntityDatabase {
 		}
 		return result;
 	}
-
+	
 	/**
-	 * Fetches the data type of the attribute family with given id from the
-	 * database.
-	 * 
-	 * @return the datatype for the specified id. If multiple entities were
-	 *         found for the given id, then a random entity is chosen and has
-	 *         its datatype returned. If no id was found in the database, then
-	 *         String is returned.
+	 * Fetches a string attribute from the database using the connection of this
+	 * database. Does NOT commit or close.
 	 */
-	public DataType getDataType(String attributeId) {
-		// QUESTION Jasper @ Maarten: Met attributeId wordt xacml identifier
-		// bedoeld neem ik aan?
-		List<String> result = new ArrayList<String>();
+	public Tuple<Set<String>, DataType> getAttribute(String entityId, String key) {
 		ResultSet queryResult = null;
 		try {
-			getDataTypeStmt.setString(1, attributeId);
-			queryResult = getDataTypeStmt.executeQuery();
+			logger.info("Fetching attribute with family [" + key
+					+ "] and user id [" + entityId + "]...");
+			getStringAttributeStmt.setString(1, key);
+			getStringAttributeStmt.setLong(2, Long.valueOf(entityId));
+			queryResult = getStringAttributeStmt.executeQuery();
+
+			// process the result
+			Set<String> r = new HashSet<String>();
+			String next, dType;
+			DataType type = null;
 			while (queryResult.next()) {
-				result.add(queryResult.getString("dataType"));
+				next = queryResult.getString("value");
+				dType = queryResult.getString("dataType");
+				if (dType != null) {
+					type = DataType.valueOf(dType);
+				}
+				r.add(next);
 			}
-			if (!result.isEmpty()) {
-				if (result.size() > 1)
-					logger.warning("Multiple xacml identifiers: " + attributeId
-							+ ". Fetching random family.");
-				String type = result.get(0);
-				return DataType.valueOf(type);
-			}			
+			return new Tuple<Set<String>, DataType>(r, type);
 		} catch (SQLException e) {
-			logger.log(Level.SEVERE,
-					"Could not fetch xacml attribute identifiers", e);
-		} catch (IllegalArgumentException e) {
-			logger.log(Level.SEVERE, "Illegal datatype found in database", e);
+			logger.log(Level.SEVERE, "Cannot execute query.", e);
+			throw new RuntimeException(e);
 		} finally {
 			if(queryResult != null) {
 				try {
@@ -201,13 +186,8 @@ public class EntityDatabase {
 				}
 			}
 		}
-		return DataType.String; // QUESTION Jasper @ Maarten: wat moet ik
-								// eigenlijk in dit geval het beste doen?
-								// Hiervoor ken ik de SunXACML internals nog
-								// niet goed genoeg...
 	}
-
-
+	
 	/**
 	 * Fetches a string attribute from the database using the connection of this
 	 * database. Does NOT commit or close.
