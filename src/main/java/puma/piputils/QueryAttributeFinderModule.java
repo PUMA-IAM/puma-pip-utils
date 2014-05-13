@@ -160,10 +160,10 @@ public class QueryAttributeFinderModule extends AttributeFinderModule {
 			URI issuer, URI subjectCategory, EvaluationCtx context,
 			int designatorType) {
 		// make sure we support this attribute id
-		if (!supportsId(attributeId)) {
+		/*if (!supportsId(attributeId)) {
 			return new EvaluationResult(
 					BagAttribute.createEmptyBag(attributeType));
-		}
+		}*/
 
 		// // make sure we've been asked for a string
 		// if (!attributeType.toString().equals(StringAttribute.identifier)) {
