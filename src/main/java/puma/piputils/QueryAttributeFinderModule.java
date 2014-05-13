@@ -252,7 +252,7 @@ public class QueryAttributeFinderModule extends AttributeFinderModule {
 				entityId);
 
 		if (values.isEmpty()) {
-			logger.warning("No values received from the db for attribute #" + attributeId);
+			logger.info("No values received from the db for attribute #" + attributeId);
 			return new EvaluationResult(
 					BagAttribute.createEmptyBag(attributeType));
 		} else {
@@ -288,52 +288,55 @@ public class QueryAttributeFinderModule extends AttributeFinderModule {
 		Tuple<Set<String>, DataType> queryResult = this.edb.getAttribute(entityId, attributeId);
 				
 		List<AttributeValue> result = new ArrayList<AttributeValue>();
-		
-		if (queryResult.getType().equals(DataType.String)) {
-			Collection<String> values = queryResult.getData();
-			if (values.isEmpty()) {
-				logger.warning("No values found for attribute (attribute id: "
-						+ attributeId + ", entity id: " + entityId + ")");
-			} else {
-				for (String s : values) {
-					result.add(new StringAttribute(s));
+		if (queryResult.hasType()) {
+			if (queryResult.getType().equals(DataType.String)) {
+				Collection<String> values = queryResult.getData();
+				if (values.isEmpty()) {
+					logger.info("No values found for attribute (attribute id: "
+							+ attributeId + ", entity id: " + entityId + ")");
+				} else {
+					for (String s : values) {
+						result.add(new StringAttribute(s));
+					}
 				}
-			}
-		} else if (queryResult.getType().equals(DataType.Boolean)) {
-			Collection<Boolean> values = new HashSet<Boolean>();
-			for (String next: queryResult.getData())
-				values.add(Boolean.parseBoolean(next));
-			if (values.isEmpty()) {
-				logger.warning("No values found for attribute (attribute id: "
-						+ attributeId + ", entity id: " + entityId + ")");
-			} else {
-				for (Boolean b : values) {
-					result.add(BooleanAttribute.getInstance(b));
-				}
-			}
-		} else if (queryResult.getType().equals(DataType.DateTime)) {
-			Collection<Date> values = new HashSet<Date>();
-			for (String next: queryResult.getData())
-				try {
-					values.add(new SimpleDateFormat("MMMM d, yyyy", Locale.ENGLISH).parse(next)); // DEBUG LATER this may not be the format in which the date is stored in the db
-				} catch (ParseException e) {
-					logger.warning("Could not parse date from internal format. Returning empty result...");
-				}	
-			if (values.isEmpty()) {
-				logger.warning("No values found for attribute (attribute id: "
-						+ attributeId + ", entity id: " + entityId + ")");
-			} else {
-				for (Date d : values) {
-					result.add(new DateTimeAttribute(d));
-				}
-			}
-		} else if (queryResult.getType().equals(DataType.Integer)) {
-			if (queryResult.getData().isEmpty()) {
-				logger.warning("No values found for attribute (attribute id: "
-						+ attributeId + ", entity id: " + entityId + ")");
-			} else {
+			} else if (queryResult.getType().equals(DataType.Boolean)) {
+				Collection<Boolean> values = new HashSet<Boolean>();
 				for (String next: queryResult.getData()) {
-					result.add(IntegerAttribute.getInstance(next));
+					values.add(Boolean.parseBoolean(next));
+					logger.info("Found attribute: [" + next + "]");
+				}
+				if (values.isEmpty()) {
+					logger.info("No values found for attribute (attribute id: "
+							+ attributeId + ", entity id: " + entityId + ")");
+				} else {
+					for (Boolean b : values) {
+						result.add(BooleanAttribute.getInstance(b));
+					}
+				}
+			} else if (queryResult.getType().equals(DataType.DateTime)) {
+				Collection<Date> values = new HashSet<Date>();
+				for (String next: queryResult.getData())
+					try {
+						values.add(new SimpleDateFormat("MMMM d, yyyy", Locale.ENGLISH).parse(next)); // DEBUG LATER this may not be the format in which the date is stored in the db
+					} catch (ParseException e) {
+						logger.warning("Could not parse date from internal format. Returning empty result...");
+					}	
+				if (values.isEmpty()) {
+					logger.info("No values found for attribute (attribute id: "
+							+ attributeId + ", entity id: " + entityId + ")");
+				} else {
+					for (Date d : values) {
+						result.add(new DateTimeAttribute(d));
+					}
+				}
+			} else if (queryResult.getType().equals(DataType.Integer)) {
+				if (queryResult.getData().isEmpty()) {
+					logger.info("No values found for attribute (attribute id: "
+							+ attributeId + ", entity id: " + entityId + ")");
+				} else {
+					for (String next: queryResult.getData()) {
+						result.add(IntegerAttribute.getInstance(next));
+					}
 				}
 			}
 		}

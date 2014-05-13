@@ -16,4 +16,8 @@ public class Tuple<S, D> {
 	public D getType() {
 		return this.type;
 	}
+	
+	public boolean hasType() {
+		return this.getType() != null;
+	}
 }

@@ -32,9 +32,10 @@ public class EntityDatabase {
 
 	private static final Logger logger = Logger.getLogger(EntityDatabase.class
 			.getName());
-	private static final String DB_USER = "admin";
-	private static final String DB_PASSWORD = "admin";
+	private static final String DB_USER = "root";
+	private static final String DB_PASSWORD = "root";
 	private static final String DB_CONNECTION = "jdbc:mysql://localhost:3306/puma-mgmt";
+	private static final String CONNECTION_ID = "puma.attr.db.connection";
 
 	private static ComboPooledDataSource cpds;
 
@@ -45,7 +46,10 @@ public class EntityDatabase {
 		try {
 			cpds = new ComboPooledDataSource();
 			cpds.setDriverClass("com.mysql.jdbc.Driver");
-			cpds.setJdbcUrl(DB_CONNECTION);
+			if (System.getProperty(CONNECTION_ID) == null)
+				cpds.setJdbcUrl(DB_CONNECTION);
+			else
+				cpds.setJdbcUrl(System.getProperty(CONNECTION_ID));
 			cpds.setMaxPoolSize(30);
 			cpds.setMinPoolSize(1);
 			cpds.setUser(DB_USER);
