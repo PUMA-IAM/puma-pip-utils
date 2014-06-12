@@ -3,11 +3,6 @@
   <groupId>puma-pip-utils</groupId>
   <artifactId>puma-pip-utils</artifactId>
   <version>1.0</version>
-	<parent>
-		<groupId>puma</groupId>
-		<artifactId>main</artifactId>
-		<version>1.0</version>
-	</parent>
   <build>
 		<finalName>sunxacml</finalName>
 		<plugins>
