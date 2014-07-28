@@ -180,6 +180,9 @@ public class EntityDatabase {
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE, "Cannot execute query.", e);
 			throw new RuntimeException(e);
+		} catch (NumberFormatException e) {
+			logger.log(Level.SEVERE, "Cannot execute query: could not find value of " + key + " (entity id \'" + entityId + "\' is not parsable) - returning no value", e);
+			return new Tuple<Set<String>, DataType>(new HashSet<String>(), DataType.String);
 		} finally {
 			if(queryResult != null) {
 				try {
