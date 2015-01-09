@@ -26,8 +26,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.DateFormat;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -88,6 +90,7 @@ public class EntityDatabase {
 
 	private PreparedStatement getStringAttributeStmt = null;
 	private PreparedStatement getSupportedXACMLAttributeIdsStmt = null;
+	private PreparedStatement getAttributeFamiliesStmt = null;
 
 	/**
 	 * Sets up the connection to the database in read/write mode. Autocommit is
@@ -109,6 +112,7 @@ public class EntityDatabase {
 			conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
 			getStringAttributeStmt = this.conn.prepareStatement("SELECT SP_ATTR.value, SP_ATTRTYPE.dataType FROM SP_ATTRTYPE USE INDEX (familyById) INNER JOIN SP_ATTR ON SP_ATTR.family_id=SP_ATTRTYPE.id AND SP_ATTRTYPE.xacmlIdentifier=? and SP_ATTR.user_id=?");
 			getSupportedXACMLAttributeIdsStmt = this.conn.prepareStatement("SELECT xacmlIdentifier FROM SP_ATTRTYPE");
+			getAttributeFamiliesStmt = this.conn.prepareStatement("SELECT xacmlIdentifier FROM SP_ATTRTYPE WHERE SP_ATTRTYPE.definedBy_id = ?");
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE, "Cannot open connection.", e);
 		}
@@ -140,6 +144,49 @@ public class EntityDatabase {
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE,
 					"Error when closing connection to the database.", e);
+		}
+	}
+	
+	/**
+	 * Fetches a string attribute from the database using the connection of this
+	 * database. Does NOT commit or close.
+	 */
+	public List<AttributeFamily> getAttributeFamiliesOfTenant(String tenantId) {
+		ResultSet queryResult = null;
+		try {
+			logger.info("Fetching attribute families of tenant with id [" + tenantId + "]...");
+			getAttributeFamiliesStmt.setLong(1, Long.valueOf(tenantId));
+			queryResult = getAttributeFamiliesStmt.executeQuery();
+
+			// process the result
+			List<AttributeFamily> r = new ArrayList<AttributeFamily>();
+			String mult, dType, xacmlName;
+			Multiplicity multiplicity = null;
+			DataType dataType = null;
+			while (queryResult.next()) {
+				mult = queryResult.getString("multiplicity");
+				dType = queryResult.getString("dataType");
+				xacmlName = queryResult.getString("xacmlIdentifier");
+				dataType = DataType.valueOf(dType);
+				multiplicity = Multiplicity.valueOf(mult);
+				r.add(new AttributeFamily(multiplicity, dataType, xacmlName));
+			}
+			return r;
+		} catch (SQLException e) {
+			logger.log(Level.SEVERE, "Cannot execute query.", e);
+			throw new RuntimeException(e);
+		} catch (NumberFormatException e) {
+			logger.log(Level.SEVERE, "Cannot execute query (tenant id \'" + tenantId + "\' is not parsable)", e);
+			throw new RuntimeException(e);
+		} finally {
+			if(queryResult != null) {
+				try {
+					queryResult.close();
+				} catch (SQLException e) {
+					// nothing to do
+					e.printStackTrace();
+				}
+			}
 		}
 	}
 
