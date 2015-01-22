@@ -112,7 +112,7 @@ public class EntityDatabase {
 			conn.setTransactionIsolation(Connection.TRANSACTION_READ_COMMITTED);
 			getStringAttributeStmt = this.conn.prepareStatement("SELECT SP_ATTR.value, SP_ATTRTYPE.dataType FROM SP_ATTRTYPE USE INDEX (familyById) INNER JOIN SP_ATTR ON SP_ATTR.family_id=SP_ATTRTYPE.id AND SP_ATTRTYPE.xacmlIdentifier=? and SP_ATTR.user_id=?");
 			getSupportedXACMLAttributeIdsStmt = this.conn.prepareStatement("SELECT xacmlIdentifier FROM SP_ATTRTYPE");
-			getAttributeFamiliesStmt = this.conn.prepareStatement("SELECT xacmlIdentifier FROM SP_ATTRTYPE WHERE SP_ATTRTYPE.definedBy_id = ?");
+			getAttributeFamiliesStmt = this.conn.prepareStatement("SELECT xacmlIdentifier, multiplicity, dataType FROM SP_ATTRTYPE WHERE SP_ATTRTYPE.definedBy_id = ?");
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE, "Cannot open connection.", e);
 		}
