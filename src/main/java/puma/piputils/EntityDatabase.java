@@ -91,6 +91,7 @@ public class EntityDatabase {
 	private PreparedStatement getStringAttributeStmt = null;
 	private PreparedStatement getSupportedXACMLAttributeIdsStmt = null;
 	private PreparedStatement getAttributeFamiliesStmt = null;
+	private PreparedStatement getSuperTenantId = null;
 
 	/**
 	 * Sets up the connection to the database in read/write mode. Autocommit is
@@ -113,6 +114,7 @@ public class EntityDatabase {
 			getStringAttributeStmt = this.conn.prepareStatement("SELECT SP_ATTR.value, SP_ATTRTYPE.dataType FROM SP_ATTRTYPE USE INDEX (familyById) INNER JOIN SP_ATTR ON SP_ATTR.family_id=SP_ATTRTYPE.id AND SP_ATTRTYPE.xacmlIdentifier=? and SP_ATTR.user_id=?");
 			getSupportedXACMLAttributeIdsStmt = this.conn.prepareStatement("SELECT xacmlIdentifier FROM SP_ATTRTYPE");
 			getAttributeFamiliesStmt = this.conn.prepareStatement("SELECT xacmlIdentifier, multiplicity, dataType FROM SP_ATTRTYPE WHERE SP_ATTRTYPE.definedBy_id = ?");
+			getSuperTenantId = this.conn.prepareStatement("SELECT superTenant_id FROM Organization WHERE id = ?");
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE, "Cannot open connection.", e);
 		}
@@ -140,6 +142,12 @@ public class EntityDatabase {
 			if (getSupportedXACMLAttributeIdsStmt != null) {
 				getSupportedXACMLAttributeIdsStmt.close();
 			}
+			if (getAttributeFamiliesStmt != null) {
+				getAttributeFamiliesStmt.close();
+			}
+			if (getSuperTenantId != null) {
+				getSuperTenantId.close();
+			}
 			conn.close();
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE,
@@ -148,30 +156,67 @@ public class EntityDatabase {
 	}
 	
 	/**
-	 * Fetches a string attribute from the database using the connection of this
-	 * database. Does NOT commit or close.
+	 * Fetches the list of all AttributeFamilies of the tenant with the given tenantId from 
+	 * the database using the connection of this database. Does NOT commit or close.
 	 */
 	public List<AttributeFamily> getAttributeFamiliesOfTenant(String tenantId) {
 		ResultSet queryResult = null;
 		try {
-			logger.info("Fetching attribute families of tenant with id [" + tenantId + "]...");
-			getAttributeFamiliesStmt.setLong(1, Long.valueOf(tenantId));
-			queryResult = getAttributeFamiliesStmt.executeQuery();
-
-			// process the result
 			List<AttributeFamily> r = new ArrayList<AttributeFamily>();
-			String mult, dType, xacmlName;
-			Multiplicity multiplicity = null;
-			DataType dataType = null;
-			while (queryResult.next()) {
-				mult = queryResult.getString("multiplicity");
-				dType = queryResult.getString("dataType");
-				xacmlName = queryResult.getString("xacmlIdentifier");
-				dataType = DataType.valueOf(dType);
-				multiplicity = Multiplicity.valueOf(mult);
-				r.add(new AttributeFamily(multiplicity, dataType, xacmlName));
+			
+			while(tenantId != null) {
+				logger.info("Fetching attribute families of tenant with id [" + tenantId + "]...");
+				getAttributeFamiliesStmt.setLong(1, Long.valueOf(tenantId));
+				queryResult = getAttributeFamiliesStmt.executeQuery();
+	
+				// process the result
+				String mult, dType, xacmlName;
+				Multiplicity multiplicity = null;
+				DataType dataType = null;
+				while (queryResult.next()) {
+					mult = queryResult.getString("multiplicity");
+					dType = queryResult.getString("dataType");
+					xacmlName = queryResult.getString("xacmlIdentifier");
+					dataType = DataType.valueOf(dType);
+					multiplicity = Multiplicity.valueOf(mult);
+					r.add(new AttributeFamily(multiplicity, dataType, xacmlName));
+				}
+				
+				tenantId = getSuperTenantId(tenantId);
 			}
 			return r;
+		} catch (SQLException e) {
+			logger.log(Level.SEVERE, "Cannot execute query.", e);
+			throw new RuntimeException(e);
+		} catch (NumberFormatException e) {
+			logger.log(Level.SEVERE, "Cannot execute query (tenant id \'" + tenantId + "\' is not parsable)", e);
+			throw new RuntimeException(e);
+		} finally {
+			if(queryResult != null) {
+				try {
+					queryResult.close();
+				} catch (SQLException e) {
+					// nothing to do
+					e.printStackTrace();
+				}
+			}
+		}
+	}
+	
+	private String getSuperTenantId(String tenantId) {
+		ResultSet queryResult = null;
+		try {
+			logger.info("Fetching superTenantid of tenant with id [" + tenantId + "]...");
+			getSuperTenantId.setLong(1, Long.valueOf(tenantId));
+			queryResult = getSuperTenantId.executeQuery();
+
+			// process the result
+			queryResult.next();
+			long result = queryResult.getLong("superTenant_id");
+			if(!queryResult.wasNull())
+				return Long.toString(result);
+			else
+				return null;
 		} catch (SQLException e) {
 			logger.log(Level.SEVERE, "Cannot execute query.", e);
 			throw new RuntimeException(e);
@@ -260,6 +305,7 @@ public class EntityDatabase {
 			}
 		}
 	}
+
 	
 	/**
 	 * Fetches a string attribute from the database using the connection of this
