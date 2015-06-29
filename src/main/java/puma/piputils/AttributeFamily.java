@@ -14,4 +14,11 @@ public class AttributeFamily {
 		this.simpleName = xacmlName.substring(8, xacmlName.length()); // TODO subject to change
 	}
 
+	@Override
+	public String toString() {
+		return "AttributeFamily [multiplicity=" + multiplicity + ", dataType="
+				+ dataType + ", simpleName=" + simpleName + ", xacmlName="
+				+ xacmlName + "]";
+	}
+
 }
